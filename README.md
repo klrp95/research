@@ -109,13 +109,13 @@ jump系统在收到了xulingbo域下的Cookie之后，取出xulingbo域下的Coo
 ![imamge](https://github.com/klrp95/research/blob/master/images/2.png)
 
 #### 方法3 :基于CAS的SSO系统
-相比于单系统登录，sso需要一个独立的认证中心，只有认证中心能接受用户的用户名密码等安全信息，其他系统不提供登录入口，只接受认证中心的间接授权。间接授权通过令牌实现，sso认证中心验证用户的用户名密码没问题，创建授权**令牌**，在接下来的跳转过程中，授权令牌作为参数发送给各个子系统，子系统拿到令牌，即得到了授权，可以借此创建局部会话，局部会话登录方式与单系统的登录方式相同。这个过程，也就是单点登录的原理，用下图说明：
-![imamge](https://github.com/klrp95/research/blob/master/images/3.jpeg)
-单点注销如下图所示：
+相比于单系统登录，sso需要一个独立的认证中心，只有认证中心能接受用户的用户名密码等安全信息，其他系统不提供登录入口，只接受认证中心的间接授权。间接授权通过令牌实现，sso认证中心验证用户的用户名密码没问题，创建授权**令牌**，在接下来的跳转过程中，授权令牌作为参数发送给各个子系统，子系统拿到令牌，即得到了授权，可以借此创建局部会话，局部会话登录方式与单系统的登录方式相同。这个过程，也就是单点登录的原理，用下图说明：  
+![imamge](https://github.com/klrp95/research/blob/master/images/3.jpeg)  
+单点注销如下图所示：  
 ![imamge](https://github.com/klrp95/research/blob/master/images/4.jpeg)
 
 **部署图：**  
-单点登录涉及**sso认证中心**与**众子系统**，子系统与sso认证中心需要通信以交换令牌、校验令牌及发起注销请求，因而子系统必须集成sso的客户端，sso认证中心则是sso服务端，整个单点登录过程实质是**sso客户端与服务端通信**的过程，用下图描述
+单点登录涉及**sso认证中心**与**众子系统**，子系统与sso认证中心需要通信以交换令牌、校验令牌及发起注销请求，因而子系统必须集成sso的客户端，sso认证中心则是sso服务端，整个单点登录过程实质是**sso客户端与服务端通信**的过程，用下图描述  
 ![imamge](https://github.com/klrp95/research/blob/master/images/5.jpeg)
 
 **实现：**  
@@ -140,17 +140,137 @@ sso采用客户端/服务端架构，我们先看sso-client与sso-server要实�
 
 实现参考：<https://cloud.tencent.com/developer/article/1460801>
 
+1、 sso-client拦截未登录请求  
+java拦截请求的方式有servlet、filter、listener三种方式，我们采用filter。在sso-client中新建LoginFilter.java类并实现Filter接口，在doFilter()方法中加入对未登录用户的拦截。
+
+```
+public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+    HttpServletRequest req = (HttpServletRequest) request;
+    HttpServletResponse res = (HttpServletResponse) response;
+    HttpSession session = req.getSession();
+
+    if (session.getAttribute("isLogin")) {
+        chain.doFilter(request, response);
+        return;
+    }
+    //跳转至sso认证中心
+    res.sendRedirect("sso-server-url-with-system-url");
+}
+```
+2、sso-server拦截未登录请求
+
+拦截从sso-client跳转至sso认证中心的未登录请求，跳转至登录页面，这个过程与sso-client完全一样。
+
+3、sso-server验证用户登录信息
+
+用户在登录页面输入用户名密码，请求登录，sso认证中心校验用户信息，校验成功，将会话状态标记为“已登录”。
+
+```
+@RequestMapping("/login")
+public String login(String username, String password, HttpServletRequest req) {
+    this.checkLoginInfo(username, password);
+    req.getSession().setAttribute("isLogin", true);
+    return "success";
+}
+```
+4、sso-server创建授权令牌
+
+授权令牌是一串随机字符，以什么样的方式生成都没有关系，只要不重复、不易伪造即可，下面是一个例子:  
+```
+String token = UUID.randomUUID().toString();
+```
+5、sso-client取得令牌并校验
+
+sso认证中心登录后，跳转回子系统并附上令牌，子系统（sso-client）取得令牌，然后去sso认证中心校验，在LoginFilter.java的doFilter()中添加几行：
+
+```
+// 请求附带token参数
+String token = req.getParameter("token");
+if (token != null) {
+    // 去sso认证中心校验token
+    boolean verifyResult = this.verify("sso-server-verify-url", token);
+    if (!verifyResult) {
+        res.sendRedirect("sso-server-url");
+        return;
+    }
+    chain.doFilter(request, response);
+}
+```
+verify() 方法使用httpClient实现，这里仅简略介绍，httpClient详细使用方法请参考官方文档。
+
+```
+HttpPost httpPost = new HttpPost("sso-server-verify-url-with-token");
+HttpResponse httpResponse = httpClient.execute(httpPost);
+```
+
+6、sso-server接收并处理校验令牌请求
+
+用户在sso认证中心登录成功后，sso-server创建授权令牌并存储该令牌，所以，**sso-server对令牌的校验就是去查找这个令牌是否存在以及是否过期**，令牌**校验成功**后sso-server将发送校验请求的系统注册到sso认证中心（就是存储起来的意思）。
+
+令牌与注册系统地址通常存储在 **key-value数据库（如redis）**中，redis可以为key设置**有效时间**也就是令牌的有效期。redis运行在**内存**中，速度非常快，正好sso-server不需要持久化任何数据。
+
+令牌与注册系统地址可以用下图描述的结构存储在redis中。如果不存储，注销的时候就麻烦了，用户向sso认证中心提交注销请求，sso认证中心注销全局会话，但不知道哪些系统用此全局会话建立了自己的局部会话，也不知道要向哪些子系统发送注销请求注销局部会话。  
+![imamge](https://github.com/klrp95/research/blob/master/images/8.png) 
+
+7、sso-client校验令牌成功创建局部会话
+
+令牌校验成功后，sso-client将当前局部会话标记为“已登录”，修改LoginFilter.java，添加几行：
+
+```
+if (verifyResult) {
+    session.setAttribute("isLogin", true);
+}
+```
+sso-client还需将**当前会话id与令牌绑定**，表示这个会话的登录状态与令牌相关，此关系可以用java的**hashmap**保存，保存的数据用来处理sso认证中心发来的注销请求。
+
+8、注销过程
+
+用户向子系统发送带有“logout”参数的请求（注销请求），sso-client拦截器拦截该请求，向sso认证中心发起注销请求
+
+```
+String logout = req.getParameter("logout");
+if (logout != null) {
+    this.ssoServer.logout(token);
+}
+```
+
+sso认证中心也用同样的方式识别出sso-client的请求是注销请求（带有“logout”参数），sso认证中心注销全局会话
+
+```
+@RequestMapping("/logout")
+public String logout(HttpServletRequest req) {
+    HttpSession session = req.getSession();
+    if (session != null) {
+        session.invalidate();//触发LogoutListener
+    }
+    return "redirect:/";
+}
+```
+sso认证中心有一个全局会话的监听器，一旦全局会话注销，将通知所有注册系统注销
+
+```
+public class LogoutListener implements HttpSessionListener {
+    @Override
+    public void sessionCreated(HttpSessionEvent event) {}
+    @Override
+    public void sessionDestroyed(HttpSessionEvent event) {
+        //通过httpClient向所有注册系统发送注销请求
+    }
+```
 ## 前后端分离
 
 **单体应用结构：**  
 ![imamge](https://github.com/klrp95/research/blob/master/images/6.png)  
 JSP 页面的开发步骤是首先需要前端工程师完成 HTML 代码，然后交给后端工程师转为 JSP 再进行开发，后端如果遇到页面问题，就需要找前端来解决，但是此时前端看到的代码已经不是他之前写的 HTML 了，是混合了一大堆标签的 JSP 代码。是一个串行的过程。
-
+![imamge](https://github.com/klrp95/research/blob/master/images/9.jpeg)
+用户在浏览器上发送请求，服务器端接收到请求，根据 Header 中的 token 进行用户鉴权，从数据库取出数据，处理后将结果数据填入 HTML 模板，返回给浏览器，浏览器将 HTML 展现给用户。
+   
 **前后端分离的结构：**  
 ![imamge](https://github.com/klrp95/research/blob/master/images/7.jpeg)  
 前后端分离就是把原来的一个应用，拆分成两个应用。一个**纯前端应用**，专门负责数据展示和用户交互；一个**纯后端应用**，专门负责提供数据处理接口，前端 HTML 页面通过 Ajax 调用后端 RESTful API 接口进行数据交互。  
 如图所示，前后端分离就是将一个应用拆成两个，前端应用和后端应用以  JSON 格式进行数据交互，这就是前后端分离的基本概念，目前最主流的实现方案是 **Spring Boot + Vue**，即后端使用 Spring Boot 框架进行开发，前端使用 Vue 框架进行开发。  
-这样的话，在前后端约定接口&数据&参数后，前后端并行开发（无强依赖，可前后端并行开发，如果需求变更，只要接口&参数不变，就不用两边都修改代码，开发效率高），然后前后端集成、前端页面调整后就可以了。
+这样的话，在前后端约定接口&数据&参数后，前后端并行开发（无强依赖，可前后端并行开发，如果需求变更，只要接口&参数不变，就不用两边都修改代码，开发效率高），然后前后端集成、前端页面调整后就可以了。  
+![imamge](https://github.com/klrp95/research/blob/master/images/9.jpeg)
 
 使用 **Python 3 + Django 3**结合 **Vue.js** 框架构建前后端分离Web开发平台实战：
 <https://cloud.tencent.com/developer/article/1576599>
@@ -169,6 +289,7 @@ JSP 页面的开发步骤是首先需要前端工程师完成 HTML 代码，然�
 3. html页面负责调用服务端接口产生数据（通过ajax等等，后台返回json格式数据，json数据格式因为简洁高效而取代xml）  
 4. 填充html，展现动态效果，在页面上进行解析并操作DOM。  
 
+## 微服务&Docker
 
 
 
