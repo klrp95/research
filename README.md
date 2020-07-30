@@ -105,7 +105,7 @@ session.getAttribute("isLogin");
 我们有一个系统域名为xulingbo.net,当我们登录的时候访问xulingbo.net/wp-login进行登录，登录成功之后将Cookie回写到xulingbo这个域名下。  
 我们还有一个系统域名为javaWeb.com，当我们访问inside-javaWeb的时候，我们没有Cookie，那么请求跳转到中间系统jump。此时需要将当前域名带到参数中便于jump校验。这个jump系统是在xulingbo域下的即：jump.xulingbo.net。这时候就能拿到之前写在xulingbo域下的Cookie。  
 jump系统在收到了xulingbo域下的Cookie之后，取出xulingbo域下的Cookie，并redirect请求jump.inside-javaWeb.net,这个接口也是在jump系统中，请求后jump系统将Cookie回写到inside-javaWeb域名下，这样就实现了简易的单点登录。  
-但是这种方式不是很灵活，对于数据传输的安全性没有保障，并且在销毁Cookie的时候无能为力，只能全部遍历的销毁。
+但是这种方式不是很灵活，对于数据传输的安全性没有保障，并且在销毁Cookie的时候无能为力，只能全部遍历的销毁。  
 ![imamge](https://github.com/klrp95/research/blob/master/images/2.png)
 
 #### 方法3 :基于CAS的SSO系统
