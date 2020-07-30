@@ -13,7 +13,7 @@ github存在工作区（working tree），
 ### 2. 提交、修改
 * `git add <file name> ` 提交修改或新文件把文件添加到暂存区  
 * `git commit -m “引号里写提交的摘要”` 把暂存区里的所有内容提交到当前分支（创建Git 版本库 时，Git自动为我们创建了唯一一个master分支)
-* 如果要提交到远程仓库上，需要使用：`git push origin 当前分支`。
+* 如果要提交到远程仓库上，需要使用：`git push origin 当前分支`。  
 ![imamge](https://github.com/klrp95/research/blob/master/images/0.jpeg)
 
 ### 3. 版本退回
