@@ -428,6 +428,42 @@ JSP 页面的开发步骤是首先需要前端工程师完成 HTML 代码，然�
 注释为模型／图的读者增加可理解性。
 
 ### camunda
+官方文档：<https://docs.camunda.org/manual/7.13/introduction/>  
+
+1、Camunda BPM 是一个灵活的工作流和过程自动化框架，它的核心是一个在Java虚拟机内部运行的原生BPMN2.0流程引擎，因此它可以嵌入到任何Java应用程序或运行时容器中。  
+
+Camunda是基于Java的框架，支持BPMN用于工作流和流程自动化，CMMN用于案例管理，DMN用于业务决策管理。  
+下图显示了最重要的组件以及一些典型的用户角色：
+ 
+![imamge](https://github.com/klrp95/research/blob/master/images/18.png) 
+
+2、流程引擎和基础架构
+
+* 流程引擎流程  
+引擎是一个Java库，负责执行BPMN 2.0流程，CMMN 1.1案例和DMN 1.3决策。 它具有轻量级的POJO核心，并使用关系数据库进行持久化。 MyBatis映射框架提供了ORM映射。
+* Spring框架集成  
+* CDI / Java EE集成  
+* 运行时容器集成（与应用程序服务器基础结构集成。）  
+
+3、Modeler
+
+* Camunda Modeler  
+用于BPMN 2.0和CMMN 1.1图表以及DMN 1.3决策表的建模工具。
+* bpmn.io
+建模框架和工具包的开源项目。
+
+4、Web 应用
+
+* REST API   
+REST API允许您从远程应用程序或JavaScript应用程序使用流程引擎。 （注意：REST API的文档已分解为自己的文档。）
+* Camunda Tasklist   
+一个用于人员工作流管理和用户任务的Web应用程序，它使流程参与者可以检查其工作流任务并导航到任务表单，以便处理任务并提供数据输入。
+* Camunda Cockpit 
+一个用于流程监视和操作的Web应用程序，它使您可以搜索流程实例，检查其状态并修复损坏的实例。
+* Camunda Admin 
+一个允许您管理用户、管理组和管理授权的Web应用程序。
+
+
 
 
 
