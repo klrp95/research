@@ -565,7 +565,7 @@ docker search # 从registry仓库搜索镜像
 docker pull # 从仓库下载镜像到本地
 docker push # 将一个镜像push到registry仓库中
 ```
-参考：<https://juejin.im/post/6844903766601236487>
+实现参考：<https://juejin.im/post/6844903766601236487>
 
 
 
